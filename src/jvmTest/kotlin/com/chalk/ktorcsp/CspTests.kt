@@ -21,8 +21,8 @@ import kotlin.test.assertNull
 fun Application.module() {
     install(CSP) {
         defaultConfig {
-            directive("default-src")(self, "https://www.google.com")
-            directive("img-src")(none)
+            defaultSrc(self, "https://www.google.com")
+            imgSrc(none)
             directive("test-src")(nonce)
         }
     }
@@ -37,8 +37,8 @@ fun Application.routingModule() {
     install(CSP) {
         allRequests = false
         defaultConfig {
-            directive("default-src")(self, "https://www.google.com")
-            directive("img-src")(none)
+            defaultSrc(self, "https://www.google.com")
+            imgSrc(none)
         }
     }
 
@@ -48,26 +48,26 @@ fun Application.routingModule() {
 
             get("/callAppend") {
                 call.appendCsp(extendDefault = false) {
-                    directive("style-src")(self)
+                    styleSrc(self)
                 }
                 call.respondText("Call Append")
             }
         }
 
         csp(extendDefault = true, configure = {
-            directive("style-src")(self)
+            styleSrc(self)
         }) {
             get("/extend") { call.respondText("Extend") }
         }
 
         csp(extendDefault = false, configure = {
-            directive("style-src")(self)
+            styleSrc(self)
         }) {
             get("/scratch") { call.respondText("Scratch") }
         }
 
         csp(extendDefault = false, configure = {
-            directive("default-src")(nonce)
+            defaultSrc(nonce)
         }) {
             get("/nonce") { call.respondText(call.cspNonce ?: "None") }
         }
@@ -83,21 +83,21 @@ fun Application.routingModule() {
 
         get("/callExtend") {
             call.appendCsp {
-                directive("style-src")(self)
+                styleSrc(self)
             }
             call.respondText("Call Default")
         }
 
         get("/callScratch") {
             call.appendCsp(extendDefault = false) {
-                directive("style-src")(self)
+                styleSrc(self)
             }
             call.respondText("Call Scratch")
         }
 
         get("/callNonce") {
             call.appendCsp(false) {
-                directive("default-src")(nonce)
+                defaultSrc(nonce)
             }
             call.respondText(call.cspNonce ?: "None")
         }
