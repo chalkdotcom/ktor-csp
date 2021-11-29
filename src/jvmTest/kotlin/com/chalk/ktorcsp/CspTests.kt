@@ -39,6 +39,13 @@ fun Application.routingModule() {
     routing {
         csp {
             get("/default") { call.respondText("Default") }
+
+            get("/callAppend") {
+                call.appendCsp(extendDefault = false) {
+                    directive("style-src")(self)
+                }
+                call.respondText("Call Append")
+            }
         }
 
         csp(extendDefault = true, configure = {
@@ -54,6 +61,25 @@ fun Application.routingModule() {
         }
 
         get("/disabled") { call.respondText("Disabled") }
+
+        get("/callDefault") {
+            call.appendCsp()
+            call.respondText("Call Default")
+        }
+
+        get("/callExtend") {
+            call.appendCsp {
+                directive("style-src")(self)
+            }
+            call.respondText("Call Default")
+        }
+
+        get("/callScratch") {
+            call.appendCsp(extendDefault = false) {
+                directive("style-src")(self)
+            }
+            call.respondText("Call Scratch")
+        }
     }
 }
 
@@ -114,6 +140,49 @@ class CspTests {
             handleRequest(HttpMethod.Get, "/scratch").apply {
                 assertEquals(HttpStatusCode.OK, response.status())
                 assertEquals(response.headers["Content-Security-Policy"], "style-src 'self'")
+            }
+        }
+    }
+
+    @Test
+    fun serverCallDefault() {
+        withTestApplication(Application::routingModule) {
+            handleRequest(HttpMethod.Get, "/callDefault").apply {
+                assertEquals(HttpStatusCode.OK, response.status())
+                assertEquals(response.headers["Content-Security-Policy"], "default-src 'self' https://www.google.com; img-src 'none'")
+            }
+        }
+    }
+
+    @Test
+    fun serverCallExtend() {
+        withTestApplication(Application::routingModule) {
+            handleRequest(HttpMethod.Get, "/callExtend").apply {
+                assertEquals(HttpStatusCode.OK, response.status())
+                assertEquals(response.headers["Content-Security-Policy"], "default-src 'self' https://www.google.com; img-src 'none'; style-src 'self'")
+            }
+        }
+    }
+
+    @Test
+    fun serverCallScratch() {
+        withTestApplication(Application::routingModule) {
+            handleRequest(HttpMethod.Get, "/callScratch").apply {
+                assertEquals(HttpStatusCode.OK, response.status())
+                assertEquals(response.headers["Content-Security-Policy"], "style-src 'self'")
+            }
+        }
+    }
+
+    @Test
+    fun serverCallAppend() {
+        withTestApplication(Application::routingModule) {
+            handleRequest(HttpMethod.Get, "/callAppend").apply {
+                assertEquals(HttpStatusCode.OK, response.status())
+                val headers = response.headers.values("Content-Security-Policy")
+                assertEquals(2, headers.size)
+                assertEquals(headers[0], "default-src 'self' https://www.google.com; img-src 'none'")
+                assertEquals(headers[1], "style-src 'self'")
             }
         }
     }

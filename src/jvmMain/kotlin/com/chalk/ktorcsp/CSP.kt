@@ -10,7 +10,6 @@ import io.ktor.routing.Route
 import io.ktor.routing.RouteSelector
 import io.ktor.routing.RouteSelectorEvaluation
 import io.ktor.routing.RoutingResolveContext
-import io.ktor.routing.application
 import io.ktor.util.AttributeKey
 import java.util.Base64
 import kotlin.random.Random
@@ -36,12 +35,7 @@ class CSP(val configuration: Configuration) {
 
             if (configuration.allRequests) {
                 pipeline.intercept(ApplicationCallPipeline.Features) {
-                    val config = CspConfig(Base64.getEncoder().encodeToString(Random.nextBytes(32)))
-                        .apply { configuration.configure(this, call) }
-                    call.attributes.put(ConfigKey, config)
-                    if (config.enabled) {
-                        call.response.header("Content-Security-Policy", config.toString())
-                    }
+                    call.appendCsp(true)
                 }
             }
 
@@ -59,22 +53,8 @@ fun Route.csp(
         override fun evaluate(context: RoutingResolveContext, segmentIndex: Int) = RouteSelectorEvaluation.Constant
     })
 
-    val defaultConfigure = application.feature(CSP).configuration.configure
     cspRoute.intercept(ApplicationCallPipeline.Features) {
-        val config = CspConfig(Base64.getEncoder().encodeToString(Random.nextBytes(32)))
-            .apply {
-                if (extendDefault) {
-                    defaultConfigure(this, call)
-                }
-
-                if (configure != null) {
-                    configure(call)
-                }
-            }
-        call.attributes.put(CSP.ConfigKey, config)
-        if (config.enabled) {
-            call.response.header("Content-Security-Policy", config.toString())
-        }
+        call.appendCsp(extendDefault, configure)
     }
 
     cspRoute.build()
@@ -86,3 +66,25 @@ fun Route.csp(
     configure: (CspConfig.(call: ApplicationCall) -> Unit)? = null,
     build: Route.() -> Unit,
 ) = csp(extendDefault = true, configure, build)
+
+fun ApplicationCall.appendCsp(
+    extendDefault: Boolean = true,
+    configure: (CspConfig.(ApplicationCall) -> Unit)? = null,
+): CspConfig {
+    val defaultConfigure = application.feature(CSP).configuration.configure
+    val config = CspConfig(Base64.getEncoder().encodeToString(Random.nextBytes(32)))
+        .apply {
+            if (extendDefault) {
+                defaultConfigure(this, this@appendCsp)
+            }
+
+            if (configure != null) {
+                configure(this@appendCsp)
+            }
+        }
+    attributes.put(CSP.ConfigKey, config)
+    if (config.enabled) {
+        response.header("Content-Security-Policy", config.toString())
+    }
+    return config
+}
