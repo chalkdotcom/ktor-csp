@@ -11,12 +11,13 @@ import io.ktor.routing.RouteSelector
 import io.ktor.routing.RouteSelectorEvaluation
 import io.ktor.routing.RoutingResolveContext
 import io.ktor.util.AttributeKey
+import java.security.SecureRandom
 import java.util.Base64
-import kotlin.random.Random
 
 class CSP(val configuration: Configuration) {
     class Configuration {
         internal var configure: CspConfig.(ApplicationCall) -> Unit = {}
+        internal val random = SecureRandom()
         var allRequests = true
 
         fun defaultConfig(configure: CspConfig.(ApplicationCall) -> Unit) {
@@ -72,7 +73,9 @@ fun ApplicationCall.appendCsp(
     configure: (CspConfig.(ApplicationCall) -> Unit)? = null,
 ): CspConfig {
     val defaultConfigure = application.feature(CSP).configuration.configure
-    val config = CspConfig(Base64.getEncoder().encodeToString(Random.nextBytes(32)))
+    val nonceBytes = ByteArray(32)
+    application.feature(CSP).configuration.random.nextBytes(nonceBytes)
+    val config = CspConfig(Base64.getEncoder().encodeToString(nonceBytes))
         .apply {
             if (extendDefault) {
                 defaultConfigure(this, this@appendCsp)
