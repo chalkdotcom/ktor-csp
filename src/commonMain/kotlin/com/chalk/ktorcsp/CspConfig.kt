@@ -32,9 +32,8 @@ class CspConfig(val nonceValue: String) {
 
     override fun toString(): String {
         return directives.entries
-            .filter { it.value.isNotEmpty() }
             .joinToString("; ") { (directive, values) ->
-                "$directive ${values.joinToString(" ")}"
+                if (values.isEmpty()) directive else "$directive ${values.joinToString(" ")}"
             }
     }
 
