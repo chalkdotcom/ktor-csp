@@ -88,3 +88,6 @@ fun ApplicationCall.appendCsp(
     }
     return config
 }
+
+val ApplicationCall.cspNonce: String?
+    get() = if (attributes.contains(CSP.ConfigKey)) attributes[CSP.ConfigKey].nonceValue else null

@@ -8,10 +8,14 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.response.respondText
 import io.ktor.routing.get
 import io.ktor.routing.routing
+import io.ktor.server.testing.TestApplicationResponse
 import io.ktor.server.testing.handleRequest
 import io.ktor.server.testing.withTestApplication
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 fun Application.module() {
@@ -19,11 +23,13 @@ fun Application.module() {
         defaultConfig {
             directive("default-src")(self, "https://www.google.com")
             directive("img-src")(none)
+            directive("test-src")(nonce)
         }
     }
 
     routing {
         get("/default") { call.respondText("Default") }
+        get("/nonce") { call.respondText(call.cspNonce ?: "None") }
     }
 }
 
@@ -60,7 +66,15 @@ fun Application.routingModule() {
             get("/scratch") { call.respondText("Scratch") }
         }
 
+        csp(extendDefault = false, configure = {
+            directive("default-src")(nonce)
+        }) {
+            get("/nonce") { call.respondText(call.cspNonce ?: "None") }
+        }
+
         get("/disabled") { call.respondText("Disabled") }
+
+        get("/disabledNonce") { call.respondText(call.cspNonce ?: "None") }
 
         get("/callDefault") {
             call.appendCsp()
@@ -80,8 +94,21 @@ fun Application.routingModule() {
             }
             call.respondText("Call Scratch")
         }
+
+        get("/callNonce") {
+            call.appendCsp(false) {
+                directive("default-src")(nonce)
+            }
+            call.respondText(call.cspNonce ?: "None")
+        }
     }
 }
+
+val TestApplicationResponse.cspHeader: String?
+    get() = headers["Content-Security-Policy"]
+
+val String.cspDirectives: List<String>
+    get() = split("; ")
 
 class CspTests {
     @Test
@@ -89,17 +116,37 @@ class CspTests {
         withTestApplication(Application::module) {
             handleRequest(HttpMethod.Get, "/default").apply {
                 assertEquals(HttpStatusCode.OK, response.status())
-                assertEquals(response.headers["Content-Security-Policy"], "default-src 'self' https://www.google.com; img-src 'none'")
+                val cspHeader = response.cspHeader
+                assertNotNull(cspHeader)
+                val directives = cspHeader.cspDirectives
+                assertContains(directives, "default-src 'self' https://www.google.com")
+                assertContains(directives, "img-src 'none'")
             }
         }
     }
 
     @Test
-    fun server404() {
+    fun serverDefault404() {
         withTestApplication(Application::module) {
             handleRequest(HttpMethod.Get, "/404").apply {
                 assertEquals(HttpStatusCode.NotFound, response.status())
-                assertEquals(response.headers["Content-Security-Policy"], "default-src 'self' https://www.google.com; img-src 'none'")
+                val cspHeader = response.cspHeader
+                assertNotNull(cspHeader)
+                val directives = cspHeader.cspDirectives
+                assertContains(directives, "default-src 'self' https://www.google.com")
+                assertContains(directives, "img-src 'none'")
+            }
+        }
+    }
+    @Test
+    fun serverDefaultNonce() {
+        withTestApplication(Application::module) {
+            handleRequest(HttpMethod.Get, "/nonce").apply {
+                assertEquals(HttpStatusCode.OK, response.status())
+                val cspHeader = response.cspHeader
+                assertNotNull(cspHeader)
+                assertNotEquals("None", response.content)
+                assertContains(cspHeader, "nonce-${response.content}")
             }
         }
     }
@@ -109,7 +156,18 @@ class CspTests {
         withTestApplication(Application::routingModule) {
             handleRequest(HttpMethod.Get, "/disabled").apply {
                 assertEquals(HttpStatusCode.OK, response.status())
-                assertNull(response.headers["Content-Security-Policy"])
+                assertNull(response.cspHeader)
+            }
+        }
+    }
+
+    @Test
+    fun serverRoutingDisabledNonce() {
+        withTestApplication(Application::routingModule) {
+            handleRequest(HttpMethod.Get, "/disabledNonce").apply {
+                assertEquals(HttpStatusCode.OK, response.status())
+                assertNull(response.cspHeader)
+                assertEquals("None", response.content)
             }
         }
     }
@@ -119,7 +177,11 @@ class CspTests {
         withTestApplication(Application::routingModule) {
             handleRequest(HttpMethod.Get, "/default").apply {
                 assertEquals(HttpStatusCode.OK, response.status())
-                assertEquals(response.headers["Content-Security-Policy"], "default-src 'self' https://www.google.com; img-src 'none'")
+                val cspHeader = response.cspHeader
+                assertNotNull(cspHeader)
+                val directives = cspHeader.cspDirectives
+                assertContains(directives, "default-src 'self' https://www.google.com")
+                assertContains(directives, "img-src 'none'")
             }
         }
     }
@@ -129,7 +191,13 @@ class CspTests {
         withTestApplication(Application::routingModule) {
             handleRequest(HttpMethod.Get, "/extend").apply {
                 assertEquals(HttpStatusCode.OK, response.status())
-                assertEquals(response.headers["Content-Security-Policy"], "default-src 'self' https://www.google.com; img-src 'none'; style-src 'self'")
+                assertEquals(response.cspHeader, "default-src 'self' https://www.google.com; img-src 'none'; style-src 'self'")
+                val cspHeader = response.cspHeader
+                assertNotNull(cspHeader)
+                val directives = cspHeader.cspDirectives
+                assertContains(directives, "default-src 'self' https://www.google.com")
+                assertContains(directives, "img-src 'none'")
+                assertContains(directives, "style-src 'self'")
             }
         }
     }
@@ -139,7 +207,18 @@ class CspTests {
         withTestApplication(Application::routingModule) {
             handleRequest(HttpMethod.Get, "/scratch").apply {
                 assertEquals(HttpStatusCode.OK, response.status())
-                assertEquals(response.headers["Content-Security-Policy"], "style-src 'self'")
+                assertEquals(response.cspHeader, "style-src 'self'")
+            }
+        }
+    }
+
+    @Test
+    fun serverRoutingNonce() {
+        withTestApplication(Application::routingModule) {
+            handleRequest(HttpMethod.Get, "/nonce").apply {
+                assertEquals(HttpStatusCode.OK, response.status())
+                assertNotEquals("None", response.content)
+                assertEquals(response.cspHeader, "default-src nonce-${response.content}")
             }
         }
     }
@@ -149,7 +228,11 @@ class CspTests {
         withTestApplication(Application::routingModule) {
             handleRequest(HttpMethod.Get, "/callDefault").apply {
                 assertEquals(HttpStatusCode.OK, response.status())
-                assertEquals(response.headers["Content-Security-Policy"], "default-src 'self' https://www.google.com; img-src 'none'")
+                val cspHeader = response.cspHeader
+                assertNotNull(cspHeader)
+                val directives = cspHeader.cspDirectives
+                assertContains(directives, "default-src 'self' https://www.google.com")
+                assertContains(directives, "img-src 'none'")
             }
         }
     }
@@ -159,7 +242,12 @@ class CspTests {
         withTestApplication(Application::routingModule) {
             handleRequest(HttpMethod.Get, "/callExtend").apply {
                 assertEquals(HttpStatusCode.OK, response.status())
-                assertEquals(response.headers["Content-Security-Policy"], "default-src 'self' https://www.google.com; img-src 'none'; style-src 'self'")
+                val cspHeader = response.cspHeader
+                assertNotNull(cspHeader)
+                val directives = cspHeader.cspDirectives
+                assertContains(directives, "default-src 'self' https://www.google.com")
+                assertContains(directives, "img-src 'none'")
+                assertContains(directives, "style-src 'self'")
             }
         }
     }
@@ -169,7 +257,7 @@ class CspTests {
         withTestApplication(Application::routingModule) {
             handleRequest(HttpMethod.Get, "/callScratch").apply {
                 assertEquals(HttpStatusCode.OK, response.status())
-                assertEquals(response.headers["Content-Security-Policy"], "style-src 'self'")
+                assertEquals(response.cspHeader, "style-src 'self'")
             }
         }
     }
@@ -181,8 +269,21 @@ class CspTests {
                 assertEquals(HttpStatusCode.OK, response.status())
                 val headers = response.headers.values("Content-Security-Policy")
                 assertEquals(2, headers.size)
-                assertEquals(headers[0], "default-src 'self' https://www.google.com; img-src 'none'")
+                val firstDirectives = headers[0].cspDirectives
+                assertContains(firstDirectives, "default-src 'self' https://www.google.com")
+                assertContains(firstDirectives, "img-src 'none'")
                 assertEquals(headers[1], "style-src 'self'")
+            }
+        }
+    }
+
+    @Test
+    fun serverCallNonce() {
+        withTestApplication(Application::routingModule) {
+            handleRequest(HttpMethod.Get, "/nonce").apply {
+                assertEquals(HttpStatusCode.OK, response.status())
+                assertNotEquals("None", response.content)
+                assertEquals(response.cspHeader, "default-src nonce-${response.content}")
             }
         }
     }
