@@ -146,7 +146,7 @@ class CspTests {
                 val cspHeader = response.cspHeader
                 assertNotNull(cspHeader)
                 assertNotEquals("None", response.content)
-                assertContains(cspHeader, "nonce-${response.content}")
+                assertContains(cspHeader, "'nonce-${response.content}'")
             }
         }
     }
@@ -218,7 +218,7 @@ class CspTests {
             handleRequest(HttpMethod.Get, "/nonce").apply {
                 assertEquals(HttpStatusCode.OK, response.status())
                 assertNotEquals("None", response.content)
-                assertEquals(response.cspHeader, "default-src nonce-${response.content}")
+                assertEquals(response.cspHeader, "default-src 'nonce-${response.content}'")
             }
         }
     }
@@ -283,7 +283,7 @@ class CspTests {
             handleRequest(HttpMethod.Get, "/nonce").apply {
                 assertEquals(HttpStatusCode.OK, response.status())
                 assertNotEquals("None", response.content)
-                assertEquals(response.cspHeader, "default-src nonce-${response.content}")
+                assertEquals(response.cspHeader, "default-src 'nonce-${response.content}'")
             }
         }
     }

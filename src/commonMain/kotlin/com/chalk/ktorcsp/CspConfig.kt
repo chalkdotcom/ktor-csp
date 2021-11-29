@@ -17,7 +17,7 @@ class CspConfig(val nonceValue: String) {
     val unsafeHashes = "'unsafe-hashes'"
     val unsafeAllowRedirects = "'unsafe-allow-redirects'"
     val nonce: String
-        get() = "nonce-$nonceValue"
+        get() = "'nonce-$nonceValue'"
     fun hash(algorithm: String, hash: String) = "'$algorithm-$hash'"
 
     fun directive(name: String): MutableList<String> = directives[name]
