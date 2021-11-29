@@ -1,11 +1,11 @@
 package com.chalk.ktorcsp
 
-class CspConfig {
-    var nonceValue: String = "unset"
+class CspConfig(nonce: String = "unset") {
+    var nonceValue: String = nonce
         internal set
     var directives = mutableMapOf<String, MutableList<String>>()
         internal set
-    var skip = false
+    var enabled = true
 
     val none = "'none'"
     val self = "'self'"
@@ -32,7 +32,7 @@ class CspConfig {
         val newConfig = CspConfig()
         newConfig.nonceValue = nonce
         newConfig.directives = mutableMapOf<String, MutableList<String>>().also { it.putAll(directives) }
-        newConfig.skip = skip
+        newConfig.enabled = enabled
         return newConfig
     }
 }
