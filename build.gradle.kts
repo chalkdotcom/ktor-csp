@@ -1,9 +1,10 @@
 plugins {
     kotlin("multiplatform") version "1.6.0"
+    id("convention.publication")
 }
 
-group = "com.chalk"
-version = "0.1-SNAPSHOT"
+group = ext["GROUP"]!!
+version = ext["VERSION"]!!
 
 repositories {
     mavenCentral()
