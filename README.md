@@ -1,10 +1,14 @@
 # ktor-csp
 
+[![Maven Central](https://img.shields.io/maven-central/v/com.chalk/ktor-csp.svg)](https://search.maven.org/artifact/com.chalk/ktor-csp)
+
 A Ktor web framework plugin to help configure a Content Security Policy (CSP) header.
 
 ## Installation
 
-TODO
+```kotlin
+implementation("com.chalk:ktor-csp:<version>")
+```
 
 ## Usage
 
